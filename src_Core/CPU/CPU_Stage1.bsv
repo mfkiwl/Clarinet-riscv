@@ -36,9 +36,9 @@ import Near_Mem_IFC     :: *;
 import GPR_RegFile      :: *;
 `ifdef ISA_F
 import FPR_RegFile      :: *;
+`endif
 `ifdef POSIT
 import PPR_RegFile      :: *;
-`endif
 `endif
 import CSR_RegFile      :: *;
 import EX_ALU_functions :: *;
@@ -78,14 +78,16 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 		      Bypass           bypass_from_stage2,
 		      Bypass           bypass_from_stage3,
 `ifdef ISA_F
+`ifndef ONLY_POSITS
 		      FPR_RegFile_IFC  fpr_regfile,
 		      FBypass          fbypass_from_stage2,
 		      FBypass          fbypass_from_stage3,
+`endif
+`endif
 `ifdef POSIT
                       PPR_RegFile_IFC  ppr_regfile,
 		      PBypass          pbypass_from_stage2,
 		      PBypass          pbypass_from_stage3,
-`endif
 `endif
 		      CSR_RegFile_IFC  csr_regfile,
 		      Epoch            cur_epoch,
@@ -133,6 +135,7 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
    Word rs2_val_bypassed = ((rs2 == 0) ? 0 : rs2b);
 
 `ifdef ISA_F
+`ifndef ONLY_POSITS
    // FP Register rs1 read and bypass
    let frs1_val = fpr_regfile.read_rs1 (rs1);
    match { .fbusy1a, .frs1a } = fn_fpr_bypass (fbypass_from_stage3, rs1, frs1_val);
@@ -154,6 +157,8 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
    match { .fbusy3b, .frs3b } = fn_fpr_bypass (fbypass_from_stage2, rs3, frs3a);
    Bool frs3_busy = (fbusy3a || fbusy3b);
    WordFL frs3_val_bypassed = frs3b;
+`endif
+`endif
 
 `ifdef POSIT
    // Posit Register rs1 read and bypass
@@ -170,7 +175,6 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
    Bool prs2_busy = (pbusy2a || pbusy2b);
    WordPL prs2_val_bypassed = prs2b;
 `endif
-`endif
 
    // ALU function
    let alu_inputs = ALU_Inputs {cur_priv       : cur_priv,
@@ -184,18 +188,20 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 				rs1_val        : rs1_val_bypassed,
 				rs2_val        : rs2_val_bypassed,
 `ifdef ISA_F
+`ifndef ONLY_POSITS
 				frs1_val       : frs1_val_bypassed,
 				frs2_val       : frs2_val_bypassed,
 				frs3_val       : frs3_val_bypassed,
 				frm            : csr_regfile.read_frm,
+`endif
 `ifdef INCLUDE_TANDEM_VERIF
                                 fflags         : csr_regfile.read_fflags,
 `endif
 
+`endif
 `ifdef POSIT
 				prs1_val       : prs1_val_bypassed,
 				prs2_val       : prs2_val_bypassed,
-`endif
 `endif
 				mstatus        : csr_regfile.read_mstatus,
 				misa           : csr_regfile.read_misa };
@@ -216,14 +222,14 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 					       rd_in_fpr     : alu_outputs.rd_in_fpr,
 					       rs_frm_fpr    : alu_outputs.rs_frm_fpr,
 					       val1_frm_gpr  : alu_outputs.val1_frm_gpr,
+					       rounding_mode : alu_outputs.rm,
+`endif
 `ifdef POSIT
                                                no_rd_upd     : alu_outputs.no_rd_upd,
 					       rs_frm_ppr    : alu_outputs.rs_frm_ppr,
 					       rd_in_ppr     : alu_outputs.rd_in_ppr,
 					       pval1         : alu_outputs.pval1,
 					       pval2         : alu_outputs.pval2,
-`endif
-					       rounding_mode : alu_outputs.rm,
 `endif
 `ifdef INCLUDE_TANDEM_VERIF
 					       trace_data    : alu_outputs.trace_data,
@@ -261,14 +267,14 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
 						     rd_in_fpr       : ?,
 					             rs_frm_fpr      : ?,
 					             val1_frm_gpr    : ?,
+						     rounding_mode   : ?,
+`endif
 `ifdef POSIT
 						     pval1           : ?,
 						     pval2           : ?,
 					             rs_frm_ppr      : ?,
 						     rd_in_ppr       : ?,
                                                      no_rd_upd       : ?,
-`endif
-						     rounding_mode   : ?,
 `endif
 `ifdef INCLUDE_TANDEM_VERIF
 						     trace_data: alu_outputs.trace_data,
@@ -285,16 +291,18 @@ module mkCPU_Stage1 #(Bit #(4)         verbosity,
       end
 
 `ifdef ISA_F
+`ifndef ONLY_POSITS
       // Stall if bypass pending for FPR rs1, rs2 or rs3
       else if (frs1_busy || frs2_busy || frs3_busy) begin
 	 output_stage1.ostatus = OSTATUS_BUSY;
       end
+`endif
+`endif
 `ifdef POSIT
       // Stall if bypass pending for PPR rs1, rs2 or rs3
       else if (prs1_busy || prs2_busy) begin
 	 output_stage1.ostatus = OSTATUS_BUSY;
       end
-`endif
 `endif
 
       // Trap on fetch-exception
